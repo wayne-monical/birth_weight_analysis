@@ -1,0 +1,10 @@
+---
+title: "HW 6"
+author: "Wayne Monical"
+date: "2024-12-02"
+output: github_document
+---
+
+
+## Problem 1
+
