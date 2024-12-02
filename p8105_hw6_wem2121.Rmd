@@ -258,6 +258,15 @@ model_comparison =
   )
 ```
 
+Evaluating the RMSE's of each model, we see that the mother birth weight model has significantly higher RMSE than both other candidate models. Graphing the RMSE's of each bootstrap with a violin plot, we see the same pattern. We can conclude that the mother birth weight model is worse at predicting birth weight than either other model. 
+
+```{r}
+model_comparison |> 
+  group_by(model) |> 
+  summarize(mean_rmse = mean(rmse)) |> 
+  knitr::kable()
+```
+
 
 ```{r}
 model_comparison |> 
