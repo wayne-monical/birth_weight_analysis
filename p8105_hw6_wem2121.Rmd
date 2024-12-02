@@ -23,3 +23,54 @@ weater_df =
 weather_df
 ```
 
+
+regressing tmax on tmin with bootstrapped samples 
+
+"We’ll focus on a simple linear regression with tmax as the response and tmin as the predictor"
+
+creating helper function
+```{r}
+weather_lm = function(df) {
+  lm(tmax ~ tmin, data = df)
+}
+```
+
+conducting bootstrap
+```{r}
+boot_straps = 
+  weather_df |> 
+  modelr::bootstrap(n = 5000)#  |> 
+  # map(weather_lm)
+  # broom::tidy()
+```
+
+
+```{r}
+boot_straps |> pull(strap) |> first()
+```
+
+
+```{r}
+weather_bootstrap = 
+  weather_df |> 
+  modelr::bootstrap(n = 5000) |> 
+  mutate(
+    models = map(strap, \(df) lm(tmax ~ tmin, data = df) ),
+    results = map(models, broom::tidy)) |> 
+  select(-strap, -models) |> 
+  unnest(results)
+```
+
+
+```{r}
+weather_bootstrap |> 
+  ggplot(aes(x = estimate, fill = term)) + 
+  geom_histogram() +
+  facet_wrap(. ~ term, scales = "free")+ 
+  theme(legend.position="none")
+```
+
+
+
+
+## Problem 2
