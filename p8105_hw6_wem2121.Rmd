@@ -8,6 +8,9 @@ output: github_document
 ```{r}
 library(tidyverse)
 library(glmnet)
+library(modelr)
+library(purrr)
+
 ```
 
 
@@ -199,7 +202,6 @@ unsolved |>
 
 We begin by loading the data. We ensure that our categorical variables with no true order (`mrace` and `frace`) are factors. 
 
-
 ```{r}
 birthweight = 
   read_csv('birthweight.csv') |> 
@@ -217,9 +219,70 @@ sum(is.na(birthweight))
 we will use the `glmnet` LASSO model with cross validation to select the model.
 
 ```{r}
+x = model.matrix(bwt ~ . + .:., birthweight)[,-1]
+y = birthweight |> pull(bwt)
 
+lasso_cv =
+  cv.glmnet(x, y)
+
+lambda_opt = lasso_cv[["lambda.min"]]
+```
+
+
+```{r}
+lasso_fit = 
+  glmnet(x, y, lambda = lambda_opt)
+
+lasso_fit |> broom::tidy()
+```
+
+### Comparing Models
+
+Creating a model using length at birth nd gestational age.
+
+```{r}
+length_gestation = 
+  lm(bwt ~ blength + gaweeks, birthweight)
+```
+
+
+```{r}
+bwt_interaction = 
+  lm(bwt ~ (bhead + blength + babysex)^3, birthweight)
 ```
 
 
 
+```{r}
+crossv_mc
+```
+
+
+
+```{r}
+bwt_bootstrap = 
+  x |> 
+  modelr::bootstrap(n = 5000) |> 
+  mutate(
+    bwt_lasso = \(df) glmnet(select(df, -bwt), df$bwt, lambda = lambda_opt),
+    length_gestation = map(strap, \(df) lm(bwt ~ blength + gaweeks, data = df)),
+    bwt_interaction = map(strap, \(df) lm(bwt ~ (bhead + blength + babysex)^3, data = df)),
+    results = map(models, broom::tidy), 
+    rsquare = map2(models, strap, modelr::rsquare)
+    ) |> 
+  select(-strap, -models) |> 
+  unnest(results, rsquare)
+```
+
+
+
+
+```{r}
+bwt_mm = as.dataframe(model.matrix(bwt ~ . + .:., birthweight))
+```
+
+```{r}
+birthweight |> 
+  crossv_mc(n = 100)
+```
 
