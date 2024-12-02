@@ -5,6 +5,11 @@ date: "2024-12-02"
 output: github_document
 ---
 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warnings=FALSE)
+```
+
 ```{r}
 library(tidyverse)
 library(glmnet)
@@ -19,20 +24,13 @@ library(purrr)
 
 Reading in data
 ```{r}
-weater_df = 
+weather_df = 
   read_csv('weather_df.csv')
 ```
 
-```{r}
-weather_df
-```
 
+We begin by loading in the data, regressing tmax on tmin with bootstrapped samples to obtain a bootstrapped estimate of $log(\beta_0 * \beta_1)$ and r-squared. 
 
-regressing tmax on tmin with bootstrapped samples 
-
-"We’ll focus on a simple linear regression with tmax as the response and tmin as the predictor"
-
-Conducting the bootstrap. 
 ```{r}
 weather_bootstrap = 
   weather_df |> 
@@ -46,7 +44,8 @@ weather_bootstrap =
   unnest(results, rsquare)
 ```
 
-1.965654	2.058656
+
+We find that the distribution of the bootstrapped estimate for $log(\beta_0 * \beta_1)$  are approximately normal. We find that the 2.5th and 97.5th percentiles of the bootstrapped samples of $log(\beta_0 * \beta_1)$  are 1.965654 and 2.058656 respectively. These values also constitute a 95% bootstrapped confidence interval for the value.
 ```{r}
 log_df = 
   weather_bootstrap |> 
@@ -71,8 +70,7 @@ log_df |>
 ```
 
 
-Approximately normal
-0.8932868	0.9269325
+We find that the distribution of the bootstrapped estimate for r-sqaured  are approximately normal. We find that the 2.5th and 97.5th percentiles of the bootstrapped samples of r-squared  are 0.8932868 and 0.9269325 respectively. These values also constitute a 95% bootstrapped confidence interval for the value.
 ```{r}
 rsquare_df = 
   weather_bootstrap |> 
@@ -96,16 +94,8 @@ rsquare_df |>
 
 ## Problem 2
 
-```{r}
-homicide = 
-  
-```
 
-
-
-
-
-We create the `city_state` variable, using code from homework 5. 
+We begin by reading in the homicide data. We create the `city_state` variable, using code from homework 5, and filter the data for relevant cities and `victim_race`. We drop non-numeric values from `victim_age`. 
 ```{r}
 homicide = 
   read_csv('homicide-data.csv') |> 
@@ -130,14 +120,14 @@ homicide =
 
 ### Baltimore
 
-Filtering for Baltimore
+To evaluate the data for one city, we filter for Baltimore, MD. 
 ```{r}
 baltimore = 
   homicide |>
   filter(city_state == 'Baltimore, MD')
 ```
 
-Fitting a logistic GLM for solved versus unsolved murders. Holding all other variables fixed, male homicide victims have a log odds ratio of 0.8545 higher than a female victim. A 95% confidence interval for this increase is 0.5836 to 1.125.
+We fit a logistic GLM for solved versus unsolved murders. Holding all other variables fixed, we find that male homicide victims in Baltimore, MD have a log odds ratio of 0.8545 higher than a female victims of having an unsolved murder. A 95% confidence interval for this increase is 0.5836 to 1.125 given by the calculation below.
 
 ```{r}
 baltimore_glm = 
@@ -146,7 +136,10 @@ baltimore_glm =
     data = baltimore,
     family = binomial())
 
-broom::tidy(baltimore_glm)
+broom::tidy(baltimore_glm) |> 
+  filter(term == 'victim_sexMale') |> 
+  select(term ,estimate, std.error) |> 
+  knitr::kable()
 ```
 Calculating the confidence interval
 ```{r}
@@ -156,7 +149,7 @@ Calculating the confidence interval
 
 ### All Cities
 
-
+We repeat the exercise with all cities by nesting the data, fitting a logistic regression model to each city's data, getting their estimates and standard errors for the log-odds change of male victims, and using the estimates and standard errors to create 95% confidence intervals.
 ```{r}
 unsolved =
   homicide |> 
@@ -182,7 +175,7 @@ unsolved =
  
  
 
-In the vast majority of US cities, the estimated log-odds change of male murder victims' proportion of unsolved cases is positive. In other words, in most cities' samples, males have a higher likelihood of their murders not being solved. Since this data is not from a random sample nor is it a complete census, any conclusions we draw from statistical tests may be flawed. With that caveat, it should be noted that many cities' confidence intervals are large enough to contain zero. In these cities, we do not have enough evidence to conclude that male murders are less likely to be solved. Since we are creating a model for each city, we should consider implementing the Bonferroni correction to the alpha value of 0.05.  
+Finally, we plot estimates and the confidence intervals for each city. In the vast majority of US cities, the estimated log-odds change of male murder victims' proportion of unsolved cases is positive. In other words, in most cities' samples, males have a higher likelihood of their murders not being solved. Since this data is not from a random sample and is not a census, any conclusions we draw from statistical tests may be flawed. With that caveat, it should be noted that many cities' confidence intervals are large enough to contain zero. In these cities, we do not have enough evidence to conclude that male murders are less likely to be solved. Since we are creating a model for each city, we should consider implementing the Bonferroni correction to the alpha value of 0.05.  
 ```{r}
 unsolved |> 
   ggplot(aes(
@@ -200,7 +193,7 @@ unsolved |>
 
 ## Problem 3
 
-We begin by loading the data. We ensure that our categorical variables with no true order (`mrace` and `frace`) are factors. 
+We begin by loading the irthweight data. We ensure that our categorical variables with no true order (`mrace` and `frace`) are factors. 
 
 ```{r}
 birthweight = 
@@ -211,78 +204,66 @@ birthweight =
   )
 ```
 
-There are no missing values in the dataframe. 
+There are no missing values in the data frame. 
 ```{r}
 sum(is.na(birthweight))
 ```
 
-we will use the `glmnet` LASSO model with cross validation to select the model.
+We hypothesize that babies' weights are under-lied by biological characteristics of their mothers. In order to evaluate this claim, we will create a linear model with all of the mother's biological data with no interaction terms and compare it to two other candidate models.
 
 ```{r}
-x = model.matrix(bwt ~ . + .:., birthweight)[,-1]
-y = birthweight |> pull(bwt)
+momdel_formula = 'bwt ~  delwt + menarche + mheight + momage + mrace + parity + pnumlbw + pnumsga + ppbmi + ppwt + smoken + wtgain'
 
-lasso_cv =
-  cv.glmnet(x, y)
-
-lambda_opt = lasso_cv[["lambda.min"]]
+momdel = 
+  lm(formula = momdel_formula,
+    data = birthweight)
 ```
 
-
+Fitting the model and plotting the residuals against the predictions with the `add_predictions` and `add_residuals` functions, there is no apparent interaction. This is an indication that the choice of model may be correct.  
 ```{r}
-lasso_fit = 
-  glmnet(x, y, lambda = lambda_opt)
-
-lasso_fit |> broom::tidy()
+birthweight |> 
+  add_predictions(momdel) |> 
+  add_residuals(momdel) |> 
+  ggplot(aes(x = pred, y = resid)) + 
+  geom_point(alpha = 0.2)+
+  ggtitle("Mother Birthweight Model Predictions Versus Residuals")
 ```
+
 
 ### Comparing Models
 
-Creating a model using length at birth nd gestational age.
+The mother birth weight model will be compared against two models. The first will regress birth weight on length at birth and gestational age. The second model will regress birth weight on head circumference at birth, birth length, sex, and all third order interaction terms.  
+
+We begin by creating 500 re-sampled test/train splits. We train each model on this data. We then get the root mean square error of all models on their test data. Then, we may evaluate the root mean square errors. 
 
 ```{r}
-length_gestation = 
-  lm(bwt ~ blength + gaweeks, birthweight)
-```
+set.seed(123)
 
-
-```{r}
-bwt_interaction = 
-  lm(bwt ~ (bhead + blength + babysex)^3, birthweight)
-```
-
-
-
-```{r}
-crossv_mc
-```
-
-
-
-```{r}
-bwt_bootstrap = 
-  x |> 
-  modelr::bootstrap(n = 5000) |> 
+model_comparison =   
+  birthweight |> 
+  crossv_mc(n = 500) |> 
   mutate(
-    bwt_lasso = \(df) glmnet(select(df, -bwt), df$bwt, lambda = lambda_opt),
-    length_gestation = map(strap, \(df) lm(bwt ~ blength + gaweeks, data = df)),
-    bwt_interaction = map(strap, \(df) lm(bwt ~ (bhead + blength + babysex)^3, data = df)),
-    results = map(models, broom::tidy), 
-    rsquare = map2(models, strap, modelr::rsquare)
+    momdel = map(train, \(df) lm(momdel_formula, data = df)),
+    len_ges = map(train, \(df) lm(bwt ~ blength + gaweeks, data = df)),
+    bwt_int = map(train, \(df) lm(bwt ~ (bhead + blength + babysex)^3, data = df)),
+    momdel_rmse = map2_dbl(momdel, test, ~rmse(.x, .y)),
+    len_ges_rmse = map2_dbl(len_ges, test, ~rmse(.x, .y)),
+    bwt_int_rmse = map2_dbl(bwt_int, test, ~rmse(.x, .y)),
     ) |> 
-  select(-strap, -models) |> 
-  unnest(results, rsquare)
+  select(momdel_rmse, len_ges_rmse, bwt_int_rmse) |> 
+  pivot_longer(
+    cols = c('momdel_rmse', 'len_ges_rmse', 'bwt_int_rmse'),
+    names_to = 'model',
+    values_to = 'rmse'
+  )
 ```
-
-
 
 
 ```{r}
-bwt_mm = as.dataframe(model.matrix(bwt ~ . + .:., birthweight))
+model_comparison |> 
+  ggplot(aes(x = model, y = rmse))+
+  geom_violin()+
+  ggtitle('RMSE Comparison of Birthweight Models')
 ```
 
-```{r}
-birthweight |> 
-  crossv_mc(n = 100)
-```
 
