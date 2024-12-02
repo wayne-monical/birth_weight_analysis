@@ -7,6 +7,7 @@ output: github_document
 
 ```{r}
 library(tidyverse)
+library(glmnet)
 ```
 
 
@@ -28,49 +29,197 @@ regressing tmax on tmin with bootstrapped samples
 
 "We’ll focus on a simple linear regression with tmax as the response and tmin as the predictor"
 
-creating helper function
-```{r}
-weather_lm = function(df) {
-  lm(tmax ~ tmin, data = df)
-}
-```
-
-conducting bootstrap
-```{r}
-boot_straps = 
-  weather_df |> 
-  modelr::bootstrap(n = 5000)#  |> 
-  # map(weather_lm)
-  # broom::tidy()
-```
-
-
-```{r}
-boot_straps |> pull(strap) |> first()
-```
-
-
+Conducting the bootstrap. 
 ```{r}
 weather_bootstrap = 
   weather_df |> 
   modelr::bootstrap(n = 5000) |> 
   mutate(
     models = map(strap, \(df) lm(tmax ~ tmin, data = df) ),
-    results = map(models, broom::tidy)) |> 
+    results = map(models, broom::tidy), 
+    rsquare = map2(models, strap, modelr::rsquare)
+    ) |> 
   select(-strap, -models) |> 
-  unnest(results)
+  unnest(results, rsquare)
 ```
 
-
+1.965654	2.058656
 ```{r}
-weather_bootstrap |> 
-  ggplot(aes(x = estimate, fill = term)) + 
-  geom_histogram() +
-  facet_wrap(. ~ term, scales = "free")+ 
-  theme(legend.position="none")
+log_df = 
+  weather_bootstrap |> 
+  pivot_wider(id_cols = .id,
+              names_from = term,
+              values_from = estimate) |> 
+  mutate(
+    log_b0_b1 = log( `(Intercept)` * tmin)
+  )
+
+log_df |> 
+  ggplot(aes(x = log_b0_b1)) + 
+  geom_histogram()+
+  ggtitle("Histogram of Bootstrapped Estimates of Log(B_0 * B_1)")
+
+log_df |> 
+  summarize(
+    quantile_2.5 = quantile(log_b0_b1, 0.025),
+    quantile_97.5 = quantile(log_b0_b1, 0.975)
+  ) |> 
+  knitr::kable()
 ```
 
 
+Approximately normal
+0.8932868	0.9269325
+```{r}
+rsquare_df = 
+  weather_bootstrap |> 
+  select(.id, rsquare) |> 
+  distinct() 
+
+
+rsquare_df |> 
+  ggplot(aes(x = rsquare)) + 
+  geom_histogram()+
+  ggtitle("Histogram of Bootstrapped Estimates of R-Square")
+
+rsquare_df |> 
+  summarize(
+    quantile_2.5 = quantile(rsquare, 0.025),
+    quantile_97.5 = quantile(rsquare, 0.975)
+  ) |> 
+  knitr::kable()
+```
 
 
 ## Problem 2
+
+```{r}
+homicide = 
+  
+```
+
+
+
+
+
+We create the `city_state` variable, using code from homework 5. 
+```{r}
+homicide = 
+  read_csv('homicide-data.csv') |> 
+  mutate(
+    city_state = paste0(city, ", ", state),
+    unsolved = disposition %in% c(
+      'Closed without arrest',
+      'Open/No arrest')) |> 
+  filter(
+    ! city_state %in% c(
+      'Dallas, TX', 
+      'Phoenix, AZ',
+      'Kansas City, MO',
+      'Tulsa, AL'),
+    victim_race %in% c('White', 'Black'),
+    victim_age != 'Unknown'
+  ) |> 
+  mutate(
+    victim_age = as.numeric(victim_age)
+  )
+```
+
+### Baltimore
+
+Filtering for Baltimore
+```{r}
+baltimore = 
+  homicide |>
+  filter(city_state == 'Baltimore, MD')
+```
+
+Fitting a logistic GLM for solved versus unsolved murders. Holding all other variables fixed, male homicide victims have a log odds ratio of 0.8545 higher than a female victim. A 95% confidence interval for this increase is 0.5836 to 1.125.
+
+```{r}
+baltimore_glm = 
+  glm(
+    formula = unsolved ~ victim_age + victim_sex + victim_race,
+    data = baltimore,
+    family = binomial())
+
+broom::tidy(baltimore_glm)
+```
+Calculating the confidence interval
+```{r}
+0.85446 - 0.13817619 * 1.96
+0.85446 + 0.13817619 * 1.96
+```
+
+### All Cities
+
+
+```{r}
+unsolved =
+  homicide |> 
+  nest(data = -city_state) |> 
+  mutate(unsolved_glm = map(data, 
+                        \(x) glm(
+                          formula = unsolved ~ victim_age + victim_sex + victim_race,
+                          data = x,
+                          family = binomial())
+                        ),
+         test_results = map(unsolved_glm, \(x) broom::tidy(x)),
+         ) |> 
+  unnest(cols = test_results) |> 
+  filter(term == 'victim_sexMale') |> 
+  select(
+    city_state, estimate, std.error
+  ) |> 
+  mutate(
+    lower_CI = estimate - 1.96 * std.error,
+    upper_CI = estimate + 1.96 * std.error
+  )
+```
+ 
+ 
+
+In the vast majority of US cities, the estimated log-odds change of male murder victims' proportion of unsolved cases is positive. In other words, in most cities' samples, males have a higher likelihood of their murders not being solved. Since this data is not from a random sample nor is it a complete census, any conclusions we draw from statistical tests may be flawed. With that caveat, it should be noted that many cities' confidence intervals are large enough to contain zero. In these cities, we do not have enough evidence to conclude that male murders are less likely to be solved. Since we are creating a model for each city, we should consider implementing the Bonferroni correction to the alpha value of 0.05.  
+```{r}
+unsolved |> 
+  ggplot(aes(
+    x = reorder(city_state, estimate),
+    y = estimate))  +  
+  geom_point() + 
+  geom_errorbar(aes(ymin = lower_CI, ymax = upper_CI))+
+  theme(axis.text.x = element_text(angle = 90))+
+  ggtitle("Male Victims' Log-Odds Change in Proportion of Unsolved Murders in US Cities") + 
+  xlab('City, State') + 
+  ylab('Proportion')
+  
+```
+
+
+## Problem 3
+
+We begin by loading the data. We ensure that our categorical variables with no true order (`mrace` and `frace`) are factors. 
+
+
+```{r}
+birthweight = 
+  read_csv('birthweight.csv') |> 
+  mutate(
+    mrace = factor(mrace),
+    frace = factor(frace)
+  )
+```
+
+There are no missing values in the dataframe. 
+```{r}
+sum(is.na(birthweight))
+```
+
+we will use the `glmnet` LASSO model with cross validation to select the model.
+
+```{r}
+
+```
+
+
+
+
