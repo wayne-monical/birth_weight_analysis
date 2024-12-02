@@ -5,6 +5,21 @@ date: "2024-12-02"
 output: github_document
 ---
 
+```{r}
+library(tidyverse)
+```
+
+
 
 ## Problem 1
+
+Reading in data
+```{r}
+weater_df = 
+  read_csv('weather_df.csv')
+```
+
+```{r}
+weather_df
+```
 
