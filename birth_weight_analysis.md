@@ -1,16 +1,11 @@
-HW 6
+Birthweight Analysis
 ================
 Wayne Monical
 2024-12-02
 
-``` r
-library(tidyverse)
-library(glmnet)
-library(modelr)
-library(purrr)
-```
+## Weather
 
-## Problem 1
+We begin with a simulation for the estimate of weather patterns.
 
 Reading in data
 
@@ -62,7 +57,7 @@ log_df |>
   ggtitle("Histogram of Bootstrapped Estimates of Log(B_0 * B_1)")
 ```
 
-![](p8105_hw6_wem2121_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
+![](birth_weight_analysis_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
 
 ``` r
 log_df |> 
@@ -75,7 +70,7 @@ log_df |>
 
 | quantile_2.5 | quantile_97.5 |
 |-------------:|--------------:|
-|     1.964223 |      2.059303 |
+|      1.96659 |      2.056866 |
 
 We find that the distribution of the bootstrapped estimate for r-sqaured
 are approximately normal. We find that the 2.5th and 97.5th percentiles
@@ -96,7 +91,7 @@ rsquare_df |>
   ggtitle("Histogram of Bootstrapped Estimates of R-Square")
 ```
 
-![](p8105_hw6_wem2121_files/figure-gfm/unnamed-chunk-5-1.png)<!-- -->
+![](birth_weight_analysis_files/figure-gfm/unnamed-chunk-5-1.png)<!-- -->
 
 ``` r
 rsquare_df |> 
@@ -109,9 +104,9 @@ rsquare_df |>
 
 | quantile_2.5 | quantile_97.5 |
 |-------------:|--------------:|
-|    0.8945921 |     0.9270773 |
+|    0.8937749 |     0.9271582 |
 
-## Problem 2
+## Homicide Data
 
 We begin by reading in the homicide data. We create the `city_state`
 variable, using code from homework 5, and filter the data for relevant
@@ -242,11 +237,11 @@ unsolved |>
   ylab('Proportion')
 ```
 
-![](p8105_hw6_wem2121_files/figure-gfm/unnamed-chunk-11-1.png)<!-- -->
+![](birth_weight_analysis_files/figure-gfm/unnamed-chunk-11-1.png)<!-- -->
 
-## Problem 3
+## Birthweight
 
-We begin by loading the irthweight data. We ensure that our categorical
+We begin by loading the birthweight data. We ensure that our categorical
 variables with no true order (`mrace` and `frace`) are factors.
 
 ``` r
@@ -293,7 +288,7 @@ birthweight |>
   ggtitle("Mother Birthweight Model Predictions Versus Residuals")
 ```
 
-![](p8105_hw6_wem2121_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
+![](birth_weight_analysis_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
 
 ### Comparing Models
 
@@ -361,4 +356,4 @@ model_comparison |>
   ggtitle('RMSE Comparison of Birthweight Models')
 ```
 
-![](p8105_hw6_wem2121_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->
+![](birth_weight_analysis_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->

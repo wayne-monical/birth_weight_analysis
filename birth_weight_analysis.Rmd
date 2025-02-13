@@ -1,5 +1,5 @@
 ---
-title: "HW 6"
+title: "Birthweight Analysis"
 author: "Wayne Monical"
 date: "2024-12-02"
 output: github_document
@@ -10,7 +10,7 @@ output: github_document
 knitr::opts_chunk$set(echo = TRUE, message=FALSE, warnings=FALSE)
 ```
 
-```{r}
+```{r, include=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
 library(tidyverse)
 library(glmnet)
 library(modelr)
@@ -20,7 +20,9 @@ library(purrr)
 
 
 
-## Problem 1
+## Weather 
+
+We begin with a simulation for the estimate of weather patterns.
 
 Reading in data
 ```{r}
@@ -92,7 +94,7 @@ rsquare_df |>
 ```
 
 
-## Problem 2
+## Homicide Data
 
 
 We begin by reading in the homicide data. We create the `city_state` variable, using code from homework 5, and filter the data for relevant cities and `victim_race`. We drop non-numeric values from `victim_age`. 
@@ -191,9 +193,9 @@ unsolved |>
 ```
 
 
-## Problem 3
+## Birthweight
 
-We begin by loading the irthweight data. We ensure that our categorical variables with no true order (`mrace` and `frace`) are factors. 
+We begin by loading the birthweight data. We ensure that our categorical variables with no true order (`mrace` and `frace`) are factors. 
 
 ```{r}
 birthweight = 
